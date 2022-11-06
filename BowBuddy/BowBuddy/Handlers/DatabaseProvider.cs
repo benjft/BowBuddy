@@ -1,37 +1,50 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using BowBuddy.Handlers.Interfaces;
+using BowBuddy.Helpers;
 using SQLite;
 using SQLiteNetExtensionsAsync.Extensions;
 
 namespace BowBuddy.Handlers {
     public class DatabaseProvider : IDataProvider {
-        public DatabaseProvider() { }
+        private readonly SQLiteAsyncConnection _databaseAsyncConnection;
         
-        private readonly Lazy<SQLiteAsyncConnection> _databaseAsyncConnection =
-            new Lazy<SQLiteAsyncConnection>(() =>
-                new SQLiteAsyncConnection(Constants.DatabasePath, Constants.DatabaseOpenFlags));
-        
-        private SQLiteAsyncConnection Database => _databaseAsyncConnection.Value;
+        public DatabaseProvider() {
+            _databaseAsyncConnection = new SQLiteAsyncConnection(Constants.DatabasePath, Constants.DatabaseOpenFlags);
+            CreateTablesForModels();
+        }
 
-        public Task RegisterDataType<T>()  where T: new() =>
-            Database.CreateTableAsync<T>();
+        private void CreateTablesForModels() {
+            var methodInfo = typeof(SQLiteAsyncConnection).GetMethod(nameof(SQLiteAsyncConnection.CreateTableAsync));
+            foreach (var type in ModelHelper.ModelTypes) {
+                methodInfo!.MakeGenericMethod(type).Invoke(_databaseAsyncConnection, null);
+            }
+        }
 
-        public Task<List<T>> GetAll<T>() where T : new() => Database.Table<T>().ToListAsync();
+        public Task<List<T>> GetAll<T>() where T : new() => 
+            _databaseAsyncConnection.Table<T>().ToListAsync();
 
-        public Task<List<T>> GetAllWithChildren<T>() where T : new() => Database.GetAllWithChildrenAsync<T>();
+        public Task<List<T>> GetAllWithChildren<T>() where T : new() => 
+            _databaseAsyncConnection.GetAllWithChildrenAsync<T>();
         
         public Task<T> Get<T>(object pk) where T : new() =>
-            Database.GetAsync<T>(pk);
+            _databaseAsyncConnection.GetAsync<T>(pk);
         
         public Task<T> GetWithChildren<T>(object pk) where T : new() =>
-            Database.GetWithChildrenAsync<T>(pk, recursive: true);
+            _databaseAsyncConnection.GetWithChildrenAsync<T>(pk, recursive: true);
 
-        public Task SaveWithChildren<T>(T value) =>
-            Database.InsertOrReplaceWithChildrenAsync(value, recursive: true);
+        public Task GetChildren<T>(T item) where T : new() => 
+            _databaseAsyncConnection.GetChildrenAsync(item, recursive: true);
+        
+        public Task Save<T>(T item) => 
+            _databaseAsyncConnection.InsertOrReplaceAsync(item);
+        
+        public Task SaveRecursive<T>(T item) =>
+            _databaseAsyncConnection.InsertOrReplaceWithChildrenAsync(item, recursive: true);
 
-        public Task DeleteRecursive<T>(T value) =>
-            Database.DeleteAsync(value, recursive: true);
+        public Task Delete<T>(T item) => _databaseAsyncConnection.DeleteAsync(item);
+        
+        public Task DeleteRecursive<T>(T item) =>
+            _databaseAsyncConnection.DeleteAsync(item, recursive: true);
     }
 }

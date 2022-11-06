@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace BowBuddy.Helpers {
     public static class DependencyInjectionHelper {
         public static IServiceCollection ConfigureServices(this IServiceCollection services) {
-            services.AddSingleton<IDataHandler, DatabaseHandler>();
+            services.AddSingleton<IDataProvider, DatabaseProvider>();
             return services;
         }
 
